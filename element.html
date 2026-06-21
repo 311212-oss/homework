@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>化學元素查詢與測驗</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans TC", sans-serif;
+      background: radial-gradient(circle at top left, #1f3f73, #0b1731);
+      color: #f8f8ff;
+      min-height: 100vh;
+    }
+    .app-shell {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3rem);
+      letter-spacing: 0.02em;
+    }
+    .subtitle {
+      color: #d7e4ff;
+      margin-top: 8px;
+      font-size: 1rem;
+    }
+    .mode-tabs {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .tab-button {
+      border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.06);
+      color: #f8f8ff;
+      padding: 12px 18px;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: transform .18s ease, background .18s ease;
+      min-width: 170px;
+    }
+    .tab-button:hover,
+    .tab-button.active {
+      background: rgba(78, 149, 255, 0.18);
+      transform: translateY(-1px);
+      border-color: #4e95ff;
+    }
+    .section {
+      display: none;
+      animation: fadeIn 0.35s ease;
+    }
+    .section.active { display: block; }
+    .card {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 24px;
+      padding: 22px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.22);
+    }
+    .input-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .input-row input,
+    .input-row button {
+      font-size: 1rem;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.18);
+      padding: 14px 16px;
+    }
+    .input-row input {
+      flex: 1;
+      min-width: 220px;
+      background: rgba(255,255,255,0.08);
+      color: #f8f8ff;
+    }
+    .input-row button {
+      background: linear-gradient(135deg, #4268ff, #6dd1ff);
+      color: #0b1030;
+      cursor: pointer;
+      min-width: 130px;
+      transition: filter .2s ease;
+    }
+    .input-row button:hover { filter: brightness(1.05); }
+    .result-grid {
+      display: grid;
+      gap: 24px;
+      grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+      align-items: start;
+    }
+    .result-block {
+      background: rgba(255,255,255,0.05);
+      border-radius: 20px;
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+    .result-block h2 {
+      margin-top: 0;
+    }
+    .detail-row {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .detail-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 10px;
+    }
+    .detail-item strong {
+      color: #d7e4ff;
+    }
+    .visualizer {
+      perspective: 1200px;
+      min-height: 380px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .orbit-stage {
+      width: 300px;
+      height: 300px;
+      position: relative;
+      transform-style: preserve-3d;
+      transform: rotateX(-18deg) rotateY(20deg);
+      transition: transform 0.1s ease;
+      cursor: grab;
+    }
+    .orbit-stage.grabbing { cursor: grabbing; }
+    .orbit-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      border: 1px dashed rgba(255,255,255,0.35);
+      border-radius: 50%;
+      transform-origin: center;
+      opacity: 0.9;
+    }
+    .orbit-ring:nth-child(1) { width: 250px; height: 250px; margin: -125px; }
+    .orbit-ring:nth-child(2) { width: 200px; height: 200px; margin: -100px; transform: rotateX(65deg); }
+    .orbit-ring:nth-child(3) { width: 170px; height: 170px; margin: -85px; transform: rotateY(55deg); }
+    .orbit-ring::after {
+      content: '';
+      display: block;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #fff 0%, rgba(255,255,255,0.2) 70%);
+      position: absolute;
+      top: 50%;
+      left: 100%;
+      margin: -7px 0 0 -7px;
+      animation: electron 5s linear infinite;
+    }
+    .orbit-ring:nth-child(1)::after { animation-duration: 6s; }
+    .orbit-ring:nth-child(2)::after { animation-duration: 5s; }
+    .orbit-ring:nth-child(3)::after { animation-duration: 4s; }
+    .nucleus {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #ffde59, #ff8a00 70%);
+      box-shadow: 0 0 40px rgba(255, 140, 0, 0.4);
+      position: absolute;
+      top: calc(50% - 50px);
+      left: calc(50% - 50px);
+      display: grid;
+      place-items: center;
+      color: #08111e;
+      font-weight: 700;
+      font-size: 1.5rem;
+      letter-spacing: 0.05em;
+    }
+    .hint {
+      margin-top: 8px;
+      color: #d0d9ff;
+      font-size: 0.95rem;
+    }
+    .info-grid {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      font-size: 0.95rem;
+      color: #e7f0ff;
+    }
+    .quiz-header,
+    .balance-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+    .quiz-card,
+    .balance-card { margin-top: 20px; }
+    .question-box {
+      background: rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,0.12);
+      margin-bottom: 18px;
+    }
+    .question-box p { margin: 0; font-size: 1.1rem; }
+    .options-grid {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .choice-button {
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.06);
+      color: #f8f8ff;
+      padding: 16px 14px;
+      border-radius: 16px;
+      cursor: pointer;
+      text-align: left;
+      transition: background .2s ease, transform .2s ease;
+    }
+    .choice-button:hover { background: rgba(78,149,255,0.2); transform: translateY(-1px); }
+    .choice-button.correct { background: rgba(33, 222, 111, 0.2); border-color: rgba(33, 222, 111, 0.45); }
+    .choice-button.wrong { background: rgba(255, 80, 93, 0.18); border-color: rgba(255, 80, 93, 0.35); }
+    .result-text { font-size: 1rem; color: #d7e4ff; }
+    .tiny-note {
+      margin-top: 10px;
+      font-size: 0.92rem;
+      color: #b9c8ff;
+    }
+    .balance-form {
+      display: grid;
+      gap: 12px;
+    }
+    .balance-form input,
+    .balance-form button {
+      width: 100%;
+      min-width: 0;
+      background: rgba(255,255,255,0.08);
+      color: #f8f8ff;
+      border: 1px solid rgba(255,255,255,0.18);
+      padding: 14px 16px;
+      border-radius: 14px;
+    }
+    .balance-form button {
+      background: linear-gradient(135deg, #4268ff, #6dd1ff);
+      color: #0b1030;
+      cursor: pointer;
+      transition: filter .2s ease;
+    }
+    .balance-form button:hover { filter: brightness(1.05); }
+    .balanced-output {
+      margin-top: 14px;
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+    .balanced-output pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: inherit;
+    }
+    .notes {
+      margin-top: 20px;
+      color: #cbd7ff;
+      line-height: 1.6;
+    }
+    @keyframes electron {
+      0% { transform: translateX(-0.5px) rotate(0deg); }
+      100% { transform: translateX(-0.5px) rotate(360deg); }
+    }
+    @media (max-width: 860px) {
+      .result-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .input-row { flex-direction: column; }
+      .quiz-header,
+      .balance-header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <div>
+        <h1>化學元素查詢與測驗</h1>
+        <p class="subtitle">搜尋元素符號、測驗名稱配對，或平衡簡單化學反應式。</p>
+      </div>
+      <div class="mode-tabs">
+        <button class="tab-button active" data-mode="lookup">搜尋化學元素</button>
+        <button class="tab-button" data-mode="quiz">化學符號測驗</button>
+        <button class="tab-button" data-mode="balance">平衡化學反應式</button>
+        <button class="tab-button" data-mode="admin">管理者新增資料</button>
+      </div>
+    </header>
+
+    <section id="lookup" class="section active card">
+      <div class="input-row">
+        <input id="searchInput" type="text" placeholder="輸入元素符號、中文名稱、英文名稱或分子式，例如 O、氧、Oxygen、H₂O" />
+        <button id="searchBtn">查詢</button>
+      </div>
+      <div id="searchMessage" class="hint">請輸入元素名稱、符號或分子式後按「查詢」。</div>
+      <div id="resultArea" class="result-grid" style="display:none;">
+        <div class="result-block">
+          <h2>元素資訊</h2>
+          <div class="detail-row" id="elementDetails"></div>
+        </div>
+        <div class="result-block">
+          <h2>3D 結構模擬</h2>
+          <div class="visualizer">
+            <div id="orbitStage" class="orbit-stage">
+              <div class="orbit-ring"></div>
+              <div class="orbit-ring"></div>
+              <div class="orbit-ring"></div>
+              <div class="nucleus" id="nucleusLabel">H</div>
+            </div>
+          </div>
+          <p class="tiny-note">拖曳模型以旋轉，呈現原子電子軌域與結構概念。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="quiz" class="section card">
+      <div class="quiz-header">
+        <div>
+          <h2>化學符號選擇題</h2>
+          <p class="tiny-note">題目會隨機出中文元素名稱或英文符號，選出正確答案。</p>
+        </div>
+        <div>
+          <span class="badge">得分：<strong id="scoreDisplay">0</strong></span>
+          <span class="badge">答題次數：<strong id="attemptsDisplay">0</strong></span>
+        </div>
+      </div>
+      <div class="quiz-card">
+        <div class="question-box"><p id="questionText">按下開始來取得第一題。</p></div>
+        <div class="options-grid" id="optionsGrid"></div>
+        <div class="input-row" style="margin-top:16px;">
+          <button id="nextQuestion">下一題</button>
+          <button id="resetQuiz">重新開始</button>
+        </div>
+        <div id="feedbackText" class="hint"></div>
+      </div>
+    </section>
+
+    <section id="balance" class="section card">
+      <div class="balance-header">
+        <div>
+          <h2>化學反應式平衡工具</h2>
+          <p class="tiny-note">輸入反應式範例：H2 + O2 -> H2O，或 CH4 + O2 -> CO2 + H2O。</p>
+        </div>
+      </div>
+      <div class="balance-card balance-form">
+        <input id="reactionInput" type="text" placeholder="輸入未平衡化學反應式" />
+        <button id="balanceBtn">平衡反應式</button>
+      </div>
+      <div id="balanceResult" class="balanced-output" style="display:none;"></div>
+    </section>
+
+    <section id="admin" class="section card">
+      <div class="balance-header">
+        <div>
+          <h2>管理者新增元素資料</h2>
+          <p class="tiny-note">填寫完整欄位後，點擊「儲存資料」送出後端。</p>
+        </div>
+      </div>
+      <form id="adminForm" class="balance-card balance-form">
+        <input id="adminSymbol" type="text" placeholder="元素符號 (例：O)" />
+        <input id="adminChinese" type="text" placeholder="中文名稱 (例：氧)" />
+        <input id="adminEnglish" type="text" placeholder="英文名稱 (例：Oxygen)" />
+        <input id="adminNumber" type="number" placeholder="原子序 (例：8)" />
+        <input id="adminMass" type="text" placeholder="原子量 (例：15.999)" />
+        <input id="adminHybrid" type="text" placeholder="混成軌域 (例：sp3)" />
+        <input id="adminAppearance" type="text" placeholder="外觀 (例：氣體)" />
+        <input id="adminStructure" type="text" placeholder="結構 (例：雙原子分子)" />
+        <button id="saveElementBtn" type="button">儲存資料</button>
+      </form>
+      <div id="adminStatus" class="hint"></div>
+    </section>
+
+    <section class="card notes">
+      <h2>使用說明</h2>
+      <ul>
+        <li>搜尋模式可輸入元素符號、中文名稱或英文名稱來取得元素資料與 3D 示意結構。</li>
+        <li>測驗模式每題隨機顯示元素名稱或符號，點選正確答案即可累積分數。</li>
+        <li>平衡工具會自動分析式子，並嘗試計算最小整數係數。</li>
+      <li>搜尋時會嘗試載入公開元素資料庫與 PubChem 分子查詢，補充更多元素與分子資料。</li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    const elements = [
+      { symbol: 'H', chinese: '氫', english: 'Hydrogen', number: 1, hybrid: '1s', appearance: '氣體', mass: '1.008' },
+      { symbol: 'He', chinese: '氦', english: 'Helium', number: 2, hybrid: '1s', appearance: '惰性氣體', mass: '4.0026' },
+      { symbol: 'C', chinese: '碳', english: 'Carbon', number: 6, hybrid: 'sp3 / sp2', appearance: '固體', mass: '12.011' },
+      { symbol: 'N', chinese: '氮', english: 'Nitrogen', number: 7, hybrid: 'sp3', appearance: '氣體', mass: '14.007' },
+      { symbol: 'O', chinese: '氧', english: 'Oxygen', number: 8, hybrid: 'sp3', appearance: '氣體', mass: '15.999' },
+      { symbol: 'F', chinese: '氟', english: 'Fluorine', number: 9, hybrid: 'sp3', appearance: '氣體', mass: '18.998' },
+      { symbol: 'Ne', chinese: '氖', english: 'Neon', number: 10, hybrid: '1s', appearance: '惰性氣體', mass: '20.180' },
+      { symbol: 'Na', chinese: '鈉', english: 'Sodium', number: 11, hybrid: '3s', appearance: '柔軟金屬', mass: '22.990' },
+      { symbol: 'Mg', chinese: '鎂', english: 'Magnesium', number: 12, hybrid: '3s', appearance: '金屬', mass: '24.305' },
+      { symbol: 'Al', chinese: '鋁', english: 'Aluminium', number: 13, hybrid: 'sp2', appearance: '金屬', mass: '26.982' },
+      { symbol: 'Si', chinese: '矽', english: 'Silicon', number: 14, hybrid: 'sp3', appearance: '固體', mass: '28.085' },
+      { symbol: 'P', chinese: '磷', english: 'Phosphorus', number: 15, hybrid: 'sp3', appearance: '固體', mass: '30.974' },
+      { symbol: 'S', chinese: '硫', english: 'Sulfur', number: 16, hybrid: 'sp3', appearance: '固體', mass: '32.06' },
+      { symbol: 'Cl', chinese: '氯', english: 'Chlorine', number: 17, hybrid: 'sp3', appearance: '氣體', mass: '35.45' },
+      { symbol: 'Ar', chinese: '氬', english: 'Argon', number: 18, hybrid: '1s', appearance: '惰性氣體', mass: '39.948' },
+    ];
+
+    const molecules = [
+      { formula: 'H2O', chinese: '水', english: 'Water', structure: '彎曲分子', description: '由兩個氫和一個氧組成。' },
+      { formula: 'CO2', chinese: '二氧化碳', english: 'Carbon dioxide', structure: '線性分子', description: '由一個碳與兩個氧組成。' },
+      { formula: 'CH4', chinese: '甲烷', english: 'Methane', structure: '四面體分子', description: '由一個碳與四個氫組成。' },
+      { formula: 'NH3', chinese: '氨', english: 'Ammonia', structure: '三角錐分子', description: '由一個氮與三個氫組成。' },
+      { formula: 'NaCl', chinese: '氯化鈉', english: 'Sodium chloride', structure: '離子晶體', description: '普通食鹽，為固體離子結晶。' },
+      { formula: 'H2SO4', chinese: '硫酸', english: 'Sulfuric acid', structure: '平面結構', description: '強酸，常用於工業。' },
+    ];
+
+    const elementDataUrl = 'https://raw.githubusercontent.com/Bowserinator/Periodic-Table-JSON/master/PeriodicTableJSON.json';
+    const moleculeApiBase = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name';
+    const chineseNames = {
+      H: '氫', He: '氦', Li: '鋰', Be: '鈹', B: '硼', C: '碳', N: '氮', O: '氧', F: '氟', Ne: '氖', Na: '鈉', Mg: '鎂', Al: '鋁', Si: '矽', P: '磷', S: '硫', Cl: '氯', Ar: '氬', K: '鉀', Ca: '鈣', Fe: '鐵', Cu: '銅', Zn: '鋅', Ag: '銀', Au: '金', Hg: '汞', Pb: '鉛', U: '鈾'
+    };
+    let remoteElements = [];
+
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const sections = document.querySelectorAll('.section');
+    const searchInput = document.getElementById('searchInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const searchMessage = document.getElementById('searchMessage');
+    const resultArea = document.getElementById('resultArea');
+    const elementDetails = document.getElementById('elementDetails');
+    const nucleusLabel = document.getElementById('nucleusLabel');
+    const orbitStage = document.getElementById('orbitStage');
+    const questionText = document.getElementById('questionText');
+    const optionsGrid = document.getElementById('optionsGrid');
+    const nextQuestion = document.getElementById('nextQuestion');
+    const resetQuiz = document.getElementById('resetQuiz');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const attemptsDisplay = document.getElementById('attemptsDisplay');
+    const feedbackText = document.getElementById('feedbackText');
+    const reactionInput = document.getElementById('reactionInput');
+    const balanceBtn = document.getElementById('balanceBtn');
+    const balanceResult = document.getElementById('balanceResult');
+
+    let currentQuestion = null;
+    let quizScore = 0;
+    let quizAttempts = 0;
+    let isAnswering = false;
+
+    function showSection(mode) {
+      sections.forEach(section => {
+        section.classList.toggle('active', section.id === mode);
+      });
+      tabButtons.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+      feedbackText.textContent = '';
+      if (mode === 'quiz' && quizAttempts === 0) {
+        buildQuestion();
+      }
+    }
+
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => showSection(button.dataset.mode));
+    });
+
+    function normalizeFullwidthDigits(value) {
+      return value
+        .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFF10 + 0x30))
+        .replace(/[₀₁₂₃₄₅₆₇₈₉]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x2080 + 0x30))
+        .replace(/[（）]/g, ch => ch === '（' ? '(' : ')')
+        .replace(/\s+/g, '');
+    }
+
+    function normalizeQuery(query) {
+      return normalizeFullwidthDigits(query.trim());
+    }
+
+    async function loadRemoteElements() {
+      try {
+        const response = await fetch(elementDataUrl);
+        if (!response.ok) throw new Error('載入元素資料失敗');
+        const data = await response.json();
+        remoteElements = data.elements.map(el => ({
+          symbol: el.symbol,
+          chinese: chineseNames[el.symbol] || el.name,
+          english: el.name,
+          number: el.number,
+          hybrid: el.electron_configuration_semantic || '未知',
+          appearance: el.appearance || '未知',
+          mass: el.atomic_mass !== undefined ? String(el.atomic_mass) : '未知',
+          summary: el.summary || '',
+          source: el.source || ''
+        }));
+      } catch (error) {
+        console.warn('遠端元素資料載入失敗', error);
+        searchMessage.textContent = '無法載入遠端元素資料，僅使用本地資料。';
+        remoteElements = [];
+      }
+    }
+
+    async function fetchPubChemMolecule(query) {
+      const normalized = normalizeQuery(query);
+      try {
+        const url = `${moleculeApiBase}/${encodeURIComponent(normalized)}/property/MolecularFormula,MolecularWeight,IUPACName/JSON`;
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const data = await response.json();
+        const props = data.PropertyTable?.Properties?.[0];
+        if (!props) return null;
+        return {
+          formula: props.MolecularFormula || normalized,
+          chinese: chineseNames[props.MolecularFormula] || '未知分子',
+          english: props.IUPACName || normalized,
+          structure: '網路查詢取得分子資料',
+          description: `分子量 ${props.MolecularWeight || '未知'}。`,
+          isExternal: true
+        };
+      } catch (error) {
+        console.warn('PubChem 查詢失敗', error);
+        return null;
+      }
+    }
+
+    async function findChemistryItem(query) {
+      const normalized = normalizeQuery(query);
+      if (!normalized) return null;
+      const elementMatch = [...elements, ...remoteElements].find(item =>
+        item.symbol.toLowerCase() === normalized.toLowerCase() ||
+        item.chinese.toLowerCase() === normalized.toLowerCase() ||
+        item.english.toLowerCase() === normalized.toLowerCase()
+      );
+      if (elementMatch) {
+        return { type: 'element', item: elementMatch };
+      }
+
+      const formula = normalized;
+      const composition = parseFormula(formula);
+      if (!composition || Object.keys(composition).length === 0) return null;
+      const allKnown = Object.keys(composition).every(sym =>
+        [...elements, ...remoteElements].some(item => item.symbol.toLowerCase() === sym.toLowerCase())
+      );
+      if (!allKnown) return null;
+      const molecule = molecules.find(m => normalizeQuery(m.formula).toLowerCase() === formula.toLowerCase()) || await fetchPubChemMolecule(formula);
+      return { type: 'molecule', item: molecule || { formula, chinese: '未知分子', english: 'Unknown molecule', structure: '分子結構示意', description: '此分子式由已知元素組成。' }, composition };
+    }
+
+    function populateElement(element) {
+
+      resultArea.style.display = 'grid';
+      searchMessage.textContent = `找到 ${element.chinese} (${element.symbol}) 的資料。`;
+      nucleusLabel.textContent = element.symbol;
+      elementDetails.innerHTML = `
+        <div class="detail-item"><span><strong>元素符號</strong></span><span>${element.symbol}</span></div>
+        <div class="detail-item"><span><strong>中文名稱</strong></span><span>${element.chinese}</span></div>
+        <div class="detail-item"><span><strong>英文名稱</strong></span><span>${element.english}</span></div>
+        <div class="detail-item"><span><strong>原子序</strong></span><span>${element.number}</span></div>
+        <div class="detail-item"><span><strong>原子量</strong></span><span>${element.mass}</span></div>
+        <div class="detail-item"><span><strong>混成軌域</strong></span><span>${element.hybrid}</span></div>
+        <div class="detail-item"><span><strong>常見外觀</strong></span><span>${element.appearance}</span></div>
+      `;
+    }
+
+    function populateMolecule(result) {
+      const { item, composition } = result;
+      resultArea.style.display = 'grid';
+      searchMessage.textContent = `找到分子式 ${item.formula} (${item.chinese}) 的資料。`;
+      nucleusLabel.textContent = item.formula;
+      const allElements = [...elements, ...remoteElements];
+      const compositionText = Object.entries(composition)
+        .map(([sym, count]) => {
+          const element = allElements.find(el => el.symbol.toLowerCase() === sym.toLowerCase());
+          return `${sym}${count > 1 ? count : ''} (${element ? element.chinese : '未知'})`;
+        }).join('，');
+      elementDetails.innerHTML = `
+        <div class="detail-item"><span><strong>化學式</strong></span><span>${item.formula}</span></div>
+        <div class="detail-item"><span><strong>中文名稱</strong></span><span>${item.chinese}</span></div>
+        <div class="detail-item"><span><strong>英文名稱</strong></span><span>${item.english}</span></div>
+        <div class="detail-item"><span><strong>分子結構</strong></span><span>${item.structure}</span></div>
+        <div class="detail-item"><span><strong>組成元素</strong></span><span>${compositionText}</span></div>
+        <div class="detail-item"><span><strong>描述</strong></span><span>${item.description}</span></div>
+      `;
+    }
+
+    searchBtn.addEventListener('click', async () => {
+      const query = searchInput.value;
+      if (!query.trim()) {
+        searchMessage.textContent = '請輸入元素名稱、符號或分子式進行查詢。';
+        resultArea.style.display = 'none';
+        return;
+      }
+      const result = await findChemistryItem(query);
+      if (!result) {
+        searchMessage.textContent = `找不到「${query}」。請輸入有效的元素符號、中文名稱、英文名稱或分子式。`;
+        resultArea.style.display = 'none';
+        return;
+      }
+      if (result.type === 'element') {
+        populateElement(result.item);
+      } else {
+        populateMolecule(result);
+      }
+    });
+
+    searchInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') searchBtn.click();
+    });
+
+    let dragActive = false;
+    let dragStart = { x: 0, y: 0 };
+    let rotation = { x: -18, y: 20 };
+
+    function updateRotation() {
+      orbitStage.style.transform = `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`;
+    }
+
+    orbitStage.addEventListener('pointerdown', e => {
+      dragActive = true;
+      dragStart = { x: e.clientX, y: e.clientY };
+      orbitStage.classList.add('grabbing');
+      orbitStage.setPointerCapture(e.pointerId);
+    });
+    orbitStage.addEventListener('pointermove', e => {
+      if (!dragActive) return;
+      const dx = e.clientX - dragStart.x;
+      const dy = e.clientY - dragStart.y;
+      rotation.y += dx * 0.3;
+      rotation.x -= dy * 0.3;
+      rotation.x = Math.max(-85, Math.min(85, rotation.x));
+      dragStart = { x: e.clientX, y: e.clientY };
+      updateRotation();
+    });
+    orbitStage.addEventListener('pointerup', e => {
+      dragActive = false;
+      orbitStage.classList.remove('grabbing');
+      orbitStage.releasePointerCapture(e.pointerId);
+    });
+    orbitStage.addEventListener('pointerleave', () => {
+      dragActive = false;
+      orbitStage.classList.remove('grabbing');
+    });
+
+    function randomChoice(array) {
+      return array[Math.floor(Math.random() * array.length)];
+    }
+
+    function buildQuestion() {
+      currentQuestion = null;
+      feedbackText.textContent = '';
+      const all = [...elements];
+      const answer = randomChoice(all);
+      const promptType = Math.random() < 0.5 ? 'symbol' : 'chinese';
+      const questionPrompt = promptType === 'symbol'
+        ? `元素符號 ${answer.symbol} 對應哪個中文名稱？`
+        : `中文名稱「${answer.chinese}」的元素符號是？`;
+      const choices = new Set([answer]);
+      while (choices.size < 4) {
+        choices.add(randomChoice(all));
+      }
+      const options = Array.from(choices).sort(() => Math.random() - 0.5);
+      currentQuestion = { answer, promptType };
+      questionText.textContent = questionPrompt;
+      optionsGrid.innerHTML = options.map(option => `
+        <button class="choice-button" data-symbol="${option.symbol}">
+          ${promptType === 'symbol' ? `${option.chinese} (${option.english})` : `${option.symbol} — ${option.english}`}
+        </button>
+      `).join('');
+      document.querySelectorAll('.choice-button').forEach(button => {
+        button.addEventListener('click', () => selectAnswer(button, option => option));
+      });
+      isAnswering = true;
+    }
+
+    function selectAnswer(button) {
+      if (!isAnswering) return;
+      isAnswering = false;
+      const selectedSymbol = button.dataset.symbol;
+      const correct = selectedSymbol === currentQuestion.answer.symbol;
+      quizAttempts += 1;
+      if (correct) {
+        quizScore += 1;
+        button.classList.add('correct');
+        feedbackText.textContent = '答對了！很棒。';
+      } else {
+        button.classList.add('wrong');
+        const correctButton = Array.from(document.querySelectorAll('.choice-button')).find(b => b.dataset.symbol === currentQuestion.answer.symbol);
+        if (correctButton) correctButton.classList.add('correct');
+        feedbackText.textContent = `答錯了。正確答案是 ${currentQuestion.answer.symbol} (${currentQuestion.answer.chinese})。`;
+      }
+      scoreDisplay.textContent = quizScore;
+      attemptsDisplay.textContent = quizAttempts;
+    }
+
+    nextQuestion.addEventListener('click', () => {
+      buildQuestion();
+    });
+    resetQuiz.addEventListener('click', () => {
+      quizScore = 0;
+      quizAttempts = 0;
+      scoreDisplay.textContent = '0';
+      attemptsDisplay.textContent = '0';
+      feedbackText.textContent = '';
+      questionText.textContent = '請按「下一題」開始測驗。';
+      optionsGrid.innerHTML = '';
+      currentQuestion = null;
+      isAnswering = false;
+    });
+
+    resetQuiz.click();
+    loadRemoteElements();
+
+    function parseFormula(formula) {
+      const tokenRegex = /([A-Z][a-z]?)(\d*)|\(|\)|\d+/g;
+      const stack = [{}];
+      let match;
+      while ((match = tokenRegex.exec(formula)) !== null) {
+        const [token, element, count] = match;
+        if (token === '(') {
+          stack.push({});
+        } else if (token === ')') {
+          const group = stack.pop();
+          const multiplierMatch = formula.slice(tokenRegex.lastIndex).match(/^\d+/);
+          const multiplier = multiplierMatch ? Number(multiplierMatch[0]) : 1;
+          if (multiplierMatch) tokenRegex.lastIndex += multiplierMatch[0].length;
+          Object.entries(group).forEach(([el, qty]) => {
+            stack[stack.length - 1][el] = (stack[stack.length - 1][el] || 0) + qty * multiplier;
+          });
+        } else if (element) {
+          const qty = count ? Number(count) : 1;
+          stack[stack.length - 1][element] = (stack[stack.length - 1][element] || 0) + qty;
+        }
+      }
+      return stack[0];
+    }
+
+    function gcd(a, b) {
+      return b === 0 ? a : gcd(b, a % b);
+    }
+    function lcm(a, b) {
+      return a / gcd(a, b) * b;
+    }
+
+    function balanceEquation(equation) {
+      const arrow = equation.includes('->') ? '->' : equation.includes('=') ? '=' : null;
+      if (!arrow) return null;
+      const [left, right] = equation.split(arrow).map(side => side.split('+').map(part => part.trim()).filter(Boolean));
+      if (!left.length || !right.length) return null;
+      const compounds = [...left, ...right];
+      const elementSet = new Set();
+      const matrix = compounds.map(compound => parseFormula(compound));
+      matrix.forEach(compound => Object.keys(compound).forEach(el => elementSet.add(el)));
+      const elementsArr = Array.from(elementSet);
+      const coeffs = Array(compounds.length).fill(1);
+      const rows = elementsArr.map(el => {
+        return compounds.map((compound, index) => {
+          const count = compound[el] || 0;
+          return index < left.length ? count : -count;
+        });
+      });
+      const n = rows.length, m = compounds.length;
+      const augmented = rows.map(row => [...row]);
+      const rank = gaussianElimination(augmented, m);
+      if (rank === null) return null;
+      const solution = nullspaceSolution(augmented, m, left.length);
+      if (!solution) return null;
+      const denominators = solution.map(value => value.denominator);
+      const commonDen = denominators.reduce((acc, d) => lcm(acc, d), 1);
+      const normalized = solution.map(value => Math.round(value.value * commonDen));
+      const divisor = normalized.reduce((acc, num) => gcd(acc, Math.abs(num)), normalized[0] || 1);
+      const finalCoeffs = normalized.map(num => num / divisor);
+      if (finalCoeffs.some(num => num <= 0)) return null;
+      return { left, right, coeffs: finalCoeffs };
+    }
+
+    function gaussianElimination(mat, cols) {
+      const rows = mat.length;
+      let rank = 0;
+      for (let c = 0; c < cols && rank < rows; c += 1) {
+        let pivot = rank;
+        while (pivot < rows && mat[pivot][c] === 0) pivot += 1;
+        if (pivot === rows) continue;
+        [mat[rank], mat[pivot]] = [mat[pivot], mat[rank]];
+        const pivotVal = mat[rank][c];
+        for (let j = c; j < cols; j += 1) mat[rank][j] /= pivotVal;
+        for (let i = 0; i < rows; i += 1) {
+          if (i !== rank) {
+            const factor = mat[i][c];
+            for (let j = c; j < cols; j += 1) mat[i][j] -= factor * mat[rank][j];
+          }
+        }
+        rank += 1;
+      }
+      return rank;
+    }
+
+    function nullspaceSolution(mat, cols, leftLength) {
+      const rows = mat.length;
+      const solution = Array(cols).fill({ value: 0, denominator: 1 });
+      let freeIndex = cols - 1;
+      for (let i = rows - 1; i >= 0; i -= 1) {
+        const row = mat[i];
+        const pivotCol = row.findIndex(value => Math.abs(value) > 1e-9);
+        if (pivotCol === -1) continue;
+        let sum = 0;
+        for (let j = pivotCol + 1; j < cols; j += 1) {
+          sum += row[j] * (solution[j].value / solution[j].denominator);
+        }
+        solution[pivotCol] = { value: -sum, denominator: 1 };
+      }
+      if (solution.every(item => item.value === 0)) {
+        solution[cols - 1] = { value: 1, denominator: 1 };
+      }
+      return solution;
+    }
+
+    balanceBtn.addEventListener('click', () => {
+      const equation = reactionInput.value.trim();
+      if (!equation) {
+        balanceResult.style.display = 'block';
+        balanceResult.textContent = '請輸入反應式，例如：H2 + O2 -> H2O';
+        return;
+      }
+      const balanced = balanceEquation(equation.replace(/\s+/g, ''));
+      if (!balanced) {
+        balanceResult.style.display = 'block';
+        balanceResult.textContent = '此反應式無法平衡，請確認格式和原子種類。';
+        return;
+      }
+      const left = balanced.left.map((compound, idx) => {
+        const coef = balanced.coeffs[idx];
+        return (coef === 1 ? '' : coef) + compound;
+      }).join(' + ');
+      const right = balanced.right.map((compound, idx) => {
+        const coef = balanced.coeffs[balanced.left.length + idx];
+        return (coef === 1 ? '' : coef) + compound;
+      }).join(' + ');
+      balanceResult.style.display = 'block';
+      balanceResult.innerHTML = `<strong>平衡反應式：</strong><pre>${left} -> ${right}</pre>`;
+    });
+
+    const adminSymbol = document.getElementById('adminSymbol');
+    const adminChinese = document.getElementById('adminChinese');
+    const adminEnglish = document.getElementById('adminEnglish');
+    const adminNumber = document.getElementById('adminNumber');
+    const adminMass = document.getElementById('adminMass');
+    const adminHybrid = document.getElementById('adminHybrid');
+    const adminAppearance = document.getElementById('adminAppearance');
+    const adminStructure = document.getElementById('adminStructure');
+    const adminStatus = document.getElementById('adminStatus');
+    const saveElementBtn = document.getElementById('saveElementBtn');
+
+    async function submitAdminElement() {
+      const payload = {
+        symbol: adminSymbol.value.trim(),
+        chinese: adminChinese.value.trim(),
+        english: adminEnglish.value.trim(),
+        number: adminNumber.value.trim(),
+        mass: adminMass.value.trim(),
+        hybrid: adminHybrid.value.trim(),
+        appearance: adminAppearance.value.trim(),
+        structure: adminStructure.value.trim(),
+      };
+
+      if (!payload.symbol || !payload.chinese || !payload.english || !payload.number || !payload.mass) {
+        adminStatus.textContent = '請填寫所有必要欄位：元素符號、中文名稱、英文名稱、原子序、原子量。';
+        adminStatus.style.color = '#ffb3b3';
+        return;
+      }
+
+      const endpoint = 'https://script.google.com/macros/s/REPLACE_WITH_YOUR_DEPLOYED_WEB_APP_URL/exec';
+      saveElementBtn.disabled = true;
+      saveElementBtn.textContent = '儲存中...';
+      adminStatus.textContent = '正在傳送資料到後端...';
+      adminStatus.style.color = '#d7e4ff';
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error(`伺服器回應 ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.success) {
+          adminStatus.textContent = '資料已成功送出，請確認 Google 試算表是否已更新。';
+          adminStatus.style.color = '#b9f7c9';
+          document.getElementById('adminForm').reset();
+        } else {
+          throw new Error(data.message || '後端回傳錯誤');
+        }
+      } catch (error) {
+        console.error(error);
+        adminStatus.textContent = `儲存失敗：${error.message}`;
+        adminStatus.style.color = '#ffb3b3';
+      } finally {
+        saveElementBtn.disabled = false;
+        saveElementBtn.textContent = '儲存資料';
+      }
+    }
+
+    saveElementBtn.addEventListener('click', submitAdminElement);
+
+    showSection('lookup');
+  </script>
+</body>
+</html>
